@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retail Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f5f7fa;
+            color: #2c3e50;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2em;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* KPI-карточки */
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .kpi-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            text-align: center;
+            transition: transform 0.2s;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-3px);
+        }
+
+        .kpi-label {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+        }
+
+        .kpi-value {
+            font-size: 1.6em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        /* Графики */
+        .charts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .chart-box {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .chart-box h2 {
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            color: #34495e;
+        }
+
+        /* Таблица */
+        .table-box {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        th {
+            background: #3498db;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .positive { color: #27ae60; font-weight: bold; }
+        .negative { color: #e74c3c; font-weight: bold; }
+
+        footer {
+            text-align: center;
+            color: #95a5a6;
+            margin-top: 30px;
+            padding: 20px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Retail Analytics Dashboard</h1>
+        <p class="subtitle">Аналитика продаж магазина · 2011–2014</p>
+
+        <!-- KPI -->
+        <div class="kpi-row" id="kpi">
+            <div class="kpi-card">
+                <div class="kpi-label">Всего заказов</div>
+                <div class="kpi-value" id="kpi-orders">...</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Общие продажи</div>
+                <div class="kpi-value" id="kpi-sales">...</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Общая прибыль</div>
+                <div class="kpi-value" id="kpi-profit">...</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Средний чек</div>
+                <div class="kpi-value" id="kpi-avg">...</div>
+            </div>
+        </div>
+
+        <!-- Графики -->
+        <div class="charts">
+            <div class="chart-box">
+                <h2>💹 Продажи по годам</h2>
+                <canvas id="salesChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <h2>📦 Продажи по категориям</h2>
+                <canvas id="categoryChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <h2>🌍 Продажи по рынкам</h2>
+                <canvas id="marketChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <h2>🎯 Выполнение целей</h2>
+                <canvas id="targetChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Таблица целей -->
+        <div class="table-box">
+            <h2>📋 Детали по годам</h2>
+            <table id="targetsTable">
+                <thead>
+                    <tr>
+                        <th>Год</th>
+                        <th>Продажи</th>
+                        <th>Цель</th>
+                        <th>Отклонение</th>
+                        <th>Выполнение</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <footer>
+            Retail Analytics · Сделано на Python + FastAPI + Chart.js
+        </footer>
+    </div>
+
+    <script>
+        // Форматирование чисел
+        const fmt = (n) => '$' + n.toLocaleString('en-US', {maximumFractionDigits: 0});
+
+        // Загружаем данные и рисуем графики
+        async function loadDashboard() {
+            // KPI
+            const stats = await fetch('/api/stats').then(r => r.json());
+            document.getElementById('kpi-orders').textContent = stats.total_orders.toLocaleString();
+            document.getElementById('kpi-sales').textContent = fmt(stats.total_sales);
+            document.getElementById('kpi-profit').textContent = fmt(stats.total_profit);
+            document.getElementById('kpi-avg').textContent = '$' + stats.avg_order.toFixed(2);
+
+            // Продажи по годам
+            const years = await fetch('/api/sales-by-year').then(r => r.json());
+            new Chart(document.getElementById('salesChart'), {
+                type: 'line',
+                data: {
+                    labels: years.map(y => y.year),
+                    datasets: [
+                        {
+                            label: 'Продажи',
+                            data: years.map(y => y.sales),
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            tension: 0.3,
+                            fill: true,
+                            pointRadius: 6,
+                        },
+                        {
+                            label: 'Прибыль',
+                            data: years.map(y => y.profit),
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                            tension: 0.3,
+                            fill: true,
+                            pointRadius: 6,
+                        }
+                    ]
+                },
+                options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+            });
+
+            // Категории
+            const cats = await fetch('/api/categories').then(r => r.json());
+            new Chart(document.getElementById('categoryChart'), {
+                type: 'bar',
+                data: {
+                    labels: cats.map(c => c.category),
+                    datasets: [{
+                        label: 'Продажи',
+                        data: cats.map(c => c.sales),
+                        backgroundColor: ['#3498db', '#9b59b6', '#f39c12']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+
+            // Рынки
+            const markets = await fetch('/api/markets').then(r => r.json());
+            new Chart(document.getElementById('marketChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: markets.map(m => m.market),
+                    datasets: [{
+                        data: markets.map(m => m.sales),
+                        backgroundColor: [
+                            '#3498db', '#e74c3c', '#f39c12', '#27ae60',
+                            '#9b59b6', '#1abc9c', '#34495e'
+                        ]
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+            });
+
+            // Цели
+            const targets = await fetch('/api/targets').then(r => r.json());
+            new Chart(document.getElementById('targetChart'), {
+                type: 'bar',
+                data: {
+                    labels: targets.map(t => t.year),
+                    datasets: [
+                        {
+                            label: 'Факт',
+                            data: targets.map(t => t.actual_sales),
+                            backgroundColor: '#3498db'
+                        },
+                        {
+                            label: 'Цель',
+                            data: targets.map(t => t.target_sales),
+                            backgroundColor: '#bdc3c7'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+
+            // Таблица целей
+            const tbody = document.querySelector('#targetsTable tbody');
+            targets.forEach(t => {
+                const diff = t.difference;
+                const diffClass = diff >= 0 ? 'positive' : 'negative';
+                const diffSign = diff >= 0 ? '+' : '';
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${t.year}</strong></td>
+                        <td>${fmt(t.actual_sales)}</td>
+                        <td>${fmt(t.target_sales)}</td>
+                        <td class="${diffClass}">${diffSign}${fmt(diff)}</td>
+                        <td><strong>${t.percent_of_target}%</strong></td>
+                    </tr>
+                `;
+            });
+        }
+
+        loadDashboard();
+    </script>
+</body>
+</html>
